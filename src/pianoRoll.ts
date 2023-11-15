@@ -772,7 +772,7 @@ export class PianoRoll {
     //restart new mouse multi-select gesture
     this.selectRect = this.svgRoot.rect().fill('#008').attr('opacity', 0.25);
     // this.selectRect.draw(event); //todo refactor - have to reimplement this
-    this.svgRoot.on('mousemove', (event)=>{
+    this.svgRoot.on('mousemove', (_)=>{
       
       //select this.notes which intersect with the selectRect (mouse selection area)
       Object.keys(this.notes).forEach((noteId)=>{
@@ -790,10 +790,10 @@ export class PianoRoll {
 
   // attaches the appropriate handlers to the mouse event allowing to to 
   // start a multi-select gesture (and later draw mode)
-  attachHandlersOnBackground(backgroundElements_: Set<Element>, svgParentObj: Svg){ 
+  attachHandlersOnBackground(backgroundElements_: Set<Element>, _: Svg){ 
     // need to listen on window so select gesture ends even if released outside the 
     // bounds of the root svg element or browser
-    window.addEventListener('mouseup', (event)=>{
+    window.addEventListener('mouseup', (_)=>{
       //end a multi-select drag gesture
       if(this.selectRect) {
         this.endSelect();
@@ -848,8 +848,11 @@ export class PianoRoll {
       if(samePitch) {
         samePitch.forEach((note)=>{
           if(selectedElem.id() != note.elem.id()) {
-            if(this.selectedElements.has(note.elem)){
+            if (this.selectedElements.has(note.elem)) {
+              
+              //@ts-ignore
               let earlierElem = note.elem.x() < selectedNote.elem.x() ? note : selectedNote;
+              //@ts-ignore
               let laterElem = note.elem.x() > selectedNote.elem.x() ? note : selectedNote; 
               //todo - handle case when two selected notes are the same pitch and you do a group resize and one overlaps another
 
