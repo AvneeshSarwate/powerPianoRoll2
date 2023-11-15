@@ -861,7 +861,9 @@ export class PianoRoll {
 
               //truncating the end of the non-selected note
               if(note.info.position < selectedNote.info.position && selectedNote.info.position < note.info.position+note.info.duration) {
-                if(this.count++ < 10) console.log(this.nonSelectedModifiedNotes, currentlyModifiedNotes, notesToRestore);
+                if (this.count++ < 10) {
+                  //console.log(this.nonSelectedModifiedNotes, currentlyModifiedNotes);
+                }
                 currentlyModifiedNotes.add(note.elem.id());
                 note.elem.show();
                 note.label.show();
