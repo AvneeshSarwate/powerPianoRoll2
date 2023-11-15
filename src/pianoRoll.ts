@@ -110,7 +110,7 @@ export class PianoRoll {
     cursorPosition: number;
     cursorWidth: number;
     playCursorElement: any;
-    backgroundElements: any;
+    backgroundElements: Set<Element> = new Set();
     quarterNoteWidth: number;
     noteHeight: number;
     whiteNotes: number[];
@@ -301,7 +301,7 @@ export class PianoRoll {
         this.refPt = this.svgRoot.node.createSVGPoint();
         this.maxZoom = this.viewportHeight / this.pianoRollHeight;
 
-        this.backgroundElements = new Set();
+        this.backgroundElements = new Set<Element>();
         for(let i = 0; i < this.numMeasures; i++){
             let color = i % 2 == 0 ? this.backgroundColor1 : this.backgroundColor2;
             let panel = this.svgRoot.rect(measureWidth, this.pianoRollHeight).move(i*measureWidth, 0).fill(color);
@@ -310,11 +310,11 @@ export class PianoRoll {
         for(let i = 1; i < numVertLines; i++){
             let xPos = i*vertLineSpace;
             let strokeWidth = xPos % this.quarterNoteWidth == 0 ? this.thickLineWidth : this.thinLineWidth;
-            let line = this.svgRoot.line(xPos, 0, xPos, this.pianoRollHeight).stroke({width: strokeWidth});
+            let line = this.svgRoot.line(xPos, 0, xPos, this.pianoRollHeight).stroke({ width: strokeWidth, color: "#000" });
             this.backgroundElements.add(line);
         }
         for(let i = 1; i < this.NUM_MIDI_NOTES; i++){
-            let line = this.svgRoot.line(0, i*this.noteHeight, this.pianoRollWidth, i*this.noteHeight).stroke({width: this.thinLineWidth});
+            let line = this.svgRoot.line(0, i * this.noteHeight, this.pianoRollWidth, i * this.noteHeight).stroke({ width: this.thinLineWidth, color: "#000" });
             this.backgroundElements.add(line);
         }
 
@@ -709,7 +709,7 @@ export class PianoRoll {
     initializeNoteModificationAction(element?: Rect){
         this.selectedNoteIds = Array.from(this.selectedElements).map(elem => elem.id());
         this.nonSelectedModifiedNotes.clear();
-        console.log('mousedown', element, !this.selectedNoteIds.includes(element.id()));
+        // console.log('mousedown', element, !this.selectedNoteIds.includes(element.id()));
         if(element && !this.selectedNoteIds.includes(element.id())) {
             if (!this.shiftKeyDown) this.clearNoteSelection();
             this.selectNote(element);
@@ -790,7 +790,7 @@ export class PianoRoll {
 
     // attaches the appropriate handlers to the mouse event allowing to to 
     // start a multi-select gesture (and later draw mode)
-    attachHandlersOnBackground(backgroundElements_: Element[], svgParentObj: Svg){ 
+    attachHandlersOnBackground(backgroundElements_: Set<Element>, svgParentObj: Svg){ 
         // need to listen on window so select gesture ends even if released outside the 
         // bounds of the root svg element or browser
         window.addEventListener('mouseup', (event)=>{
