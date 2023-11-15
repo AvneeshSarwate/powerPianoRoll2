@@ -795,14 +795,21 @@ export class PianoRoll {
     this.resizeTarget = undefined;
   }
 
-  startDragSelection(){
+  startDragSelection(dragStart: DOMPoint){
     //clear previous mouse multi-select gesture state
     this.clearNoteSelection();
 
     //restart new mouse multi-select gesture
-    this.selectRect = this.svgRoot.rect().fill('#008').attr('opacity', 0.25);
+    this.selectRect = this.svgRoot.rect().fill('#008').attr('opacity', 0.25).move(dragStart.x, dragStart.y);
     // this.selectRect.draw(event); //todo refactor - have to reimplement this
-    this.svgRoot.on('mousemove', (_)=>{
+    this.svgRoot.on('mousemove', (evt) => {
+      
+      const movePos = this.svgMouseCoord(evt as MouseEvent);
+      const newTopLeft = { x: Math.min(dragStart.x, movePos.x), y: Math.min(dragStart.y, movePos.y) };
+      const newBottomRight = { x: Math.max(dragStart.x, movePos.x), y: Math.max(dragStart.y, movePos.y) };
+
+      this.selectRect.move(newTopLeft.x, newTopLeft.y);
+      this.selectRect.size(newBottomRight.x - newTopLeft.x, newBottomRight.y - newTopLeft.y);
       
       //select this.notes which intersect with the selectRect (mouse selection area)
       Object.keys(this.notes).forEach((noteId)=>{
@@ -844,7 +851,7 @@ export class PianoRoll {
         this.cursorElement.x(posSVG-this.cursorWidth/2);
         this.cursorPosition = posSVG/this.quarterNoteWidth;
         // console.log('mousedown background', posSym, posSVG, event);
-        this.startDragSelection();
+        this.startDragSelection(mouseXY);
       });
 
       elem.on('dblclick', (event)=>{
