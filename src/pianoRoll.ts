@@ -386,15 +386,22 @@ export class PianoRoll {
   }
 
   //update note SVG element from underlying info change
-  updateNoteElement(note: Note){
-    note.elem.show();
-    note.elem.x(note.info.position * this.quarterNoteWidth);
-    note.elem.y((127-note.info.pitch)*this.noteHeight);
-    note.elem.width(note.info.duration*this.quarterNoteWidth);
-    note.label.show();
-    note.label.x(note.info.position * this.quarterNoteWidth + this.textDev);
-    note.label.y((127-note.info.pitch)*this.noteHeight);
-    note.label.text(this.svgYToPitchString(note.label.y().valueOf() as number));
+  updateNoteElement(nt: Note, position: number, pitch: number, duration: number){
+    nt.elem.show();
+    nt.label.show();
+    const yPos = (127 - pitch) * this.noteHeight
+    const xPos = position * this.quarterNoteWidth
+    const width = duration * this.quarterNoteWidth
+    this.updateNoteElemScreenCoords(nt, xPos, yPos, width);
+  }
+
+  updateNoteElemScreenCoords(nt: Note, x: number, y: number, width?: number) {
+    nt.elem.x(x);
+    nt.elem.y(y);
+    if(width) nt.elem.width(width);
+    nt.label.x(x + this.textDev);
+    nt.label.y(y);
+    nt.label.text(this.svgYToPitchString(y));
   }
 
   // Get point in global SVG space from mousemove event
@@ -600,7 +607,7 @@ export class PianoRoll {
       let note = this.notes[id];
       note.info.pitch += shiftAmount;
       this.playHandler(note.info.pitch);
-      this.updateNoteElement(note);
+      this.updateNoteElement(note, note.info.position, note.info.pitch, note.info.duration);
     });
     this.executeOverlapVisibleChanges();
     this.updateNoteStateOnModificationCompletion();
@@ -613,7 +620,7 @@ export class PianoRoll {
     this.selectedNoteIds.forEach(id => {
       let note = this.notes[id];
       note.info.position += shiftAmount;
-      this.updateNoteElement(note);
+      this.updateNoteElement(note, note.info.position, note.info.pitch, note.info.duration);
     });
     this.executeOverlapVisibleChanges();
     this.updateNoteStateOnModificationCompletion();
@@ -661,16 +668,6 @@ export class PianoRoll {
   svgYToPitchString(yVal: number){
     let pitch = this.svgYtoPitch(yVal);
     return this.midiPitchToPitchString(pitch);
-  }
-
-  //function that snapes note svg elements into place
-  snapPositionToGrid(elem: Rect, xSize: number, ySize: number){
-    elem.x(Math.round(elem.x().valueOf() as number/xSize) * xSize);
-    elem.y(Math.round(elem.y().valueOf() as number/ySize) * ySize); //because we're using lines instead of rectangles
-    let label = this.notes[elem.id()].label;
-    label.x(Math.round(elem.x().valueOf() as number/xSize) * xSize + this.textDev);
-    label.y(Math.round(elem.y().valueOf() as number/ySize) * ySize); //because we're using lines instead of rectangles
-    label.text(this.svgYToPitchString(label.y().valueOf() as number));
   }
 
   // Resets the 'start' positions/sizes of notes for multi-select transformations to current position/sizes
@@ -880,7 +877,7 @@ export class PianoRoll {
       }
     });
     let notesToRestore = this.setDifference(this.nonSelectedModifiedNotes, currentlyModifiedNotes);
-    notesToRestore.forEach(id => this.updateNoteElement(this.notes[id]));
+    notesToRestore.forEach(id => this.updateNoteElement(this.notes[id], this.notes[id].info.position, this.notes[id].info.pitch, this.notes[id].info.duration));
     this.nonSelectedModifiedNotes = currentlyModifiedNotes;
   }
 
