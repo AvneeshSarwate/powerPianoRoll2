@@ -992,7 +992,7 @@ export class PianoRoll {
       const isEndChange = event.detail.isEndChange;
       //@ts-ignore
       const startMouseEvt = event.detail.startMouseEvt;
-      const dragStartXY = this.svgMouseCoord(startMouseEvt as MouseEvent);
+      const resizeStartXY = this.svgMouseCoord(startMouseEvt as MouseEvent);
 
 
       //extracting the base dom-event from the SVG.js event so we can snapshot the current mouse coordinates
@@ -1008,14 +1008,8 @@ export class PianoRoll {
       this.resizingActive = true;
       svgParentObj.on('mousemove', (event)=>{
         let svgXY = this.svgMouseCoord(event as MouseEvent);
-        let xDevRaw = svgXY.x - this.mouseMoveRoot.svgX;
-        let oldX = this.noteModStartReference[this.resizeTarget!!.id()].x;
-        let oldY = this.noteModStartReference[this.resizeTarget!!.id()].y;
-        // let isEndChange = this.resizeTarget!!.x() === oldX; //i.e, whehter you're moving the 'start' or 'end' of the note
-        this.debugCircle0.x(dragStartXY.x);
-        this.debugCircle0.y(dragStartXY.y);
-        this.debugCircle1.x(svgXY.x);
-        this.debugCircle1.y(svgXY.y);
+        let xDevRaw = svgXY.x - resizeStartXY.x;
+
         this.selectedNoteIds.forEach((id)=>{
           let oldNoteVals = this.noteModStartReference[id];
           //inProgress - control the resizing/overlap of the selected elements here and you don't 
