@@ -98,7 +98,7 @@ type Box = {
     br: { x: number, y: number }
 }
 
-class PianoRoll {
+export class PianoRoll {
     svgRoot!: Svg;
     noteModStartReference: any;
     notes: {[key: string]: Note};
@@ -326,15 +326,15 @@ class PianoRoll {
 
     //duration is number of quarter notes, pitch is 0-indexed MIDI
     addNote(pitch: number, position: number, duration: number, avoidHistoryManipulation: boolean = false){
-        let rect = this.svgRoot.rect(duration*this.quarterNoteWidth, this.noteHeight).move(position*this.quarterNoteWidth, (127-pitch)*this.noteHeight).fill(this.noteColor);
-        this.rawSVGElementToWrapper[rect.node.id] = rect;
+        let rect = this.svgRoot.rect(duration * this.quarterNoteWidth, this.noteHeight).move(position * this.quarterNoteWidth, (127 - pitch) * this.noteHeight).fill(this.noteColor);
         rect.id(this.noteCount.toString());
+        this.rawSVGElementToWrapper[rect.id()] = rect;
         // rect.selectize({rotationPoint: false, points:['r', 'l']}).resize();
         let text = this.svgRoot.text(this.svgYToPitchString(rect.y().valueOf() as number))
             .font({size: 14})
             .move(position*this.quarterNoteWidth + this.textDev, (127-pitch)*this.noteHeight)
             // .style('pointer-events', 'none');
-        this.attachHandlersOnElement(rect, this.svgRoot);
+        this.attachHandlersOnNote(rect, this.svgRoot);
         this.notes[this.noteCount] = {
             elem: rect, 
             info: {pitch, position, duration},
@@ -709,8 +709,9 @@ class PianoRoll {
     initializeNoteModificationAction(element?: Rect){
         this.selectedNoteIds = Array.from(this.selectedElements).map(elem => elem.id());
         this.nonSelectedModifiedNotes.clear();
+        console.log('mousedown', element, !this.selectedNoteIds.includes(element.id()));
         if(element && !this.selectedNoteIds.includes(element.id())) {
-            if(!this.shiftKeyDown) this.clearNoteSelection();
+            if (!this.shiftKeyDown) this.clearNoteSelection();
             this.selectNote(element);
             this.selectedNoteIds = [element.id()];
         }
@@ -770,7 +771,7 @@ class PianoRoll {
 
         //restart new mouse multi-select gesture
         this.selectRect = this.svgRoot.rect().fill('#008').attr('opacity', 0.25);
-        // this.selectRect.draw(event);
+        // this.selectRect.draw(event); //todo refactor - have to reimplement this
         this.svgRoot.on('mousemove', (event)=>{
             
             //select this.notes which intersect with the selectRect (mouse selection area)
@@ -895,7 +896,7 @@ class PianoRoll {
     }
 
     // sets event handlers on each note element for position/resize multi-select changes
-    attachHandlersOnElement(noteElement: Element, svgParentObj: Svg){
+    attachHandlersOnNote(noteElement: Element, svgParentObj: Svg){
         
         /* Performs the same drag deviation done on the clicked element to 
          * the other selected elements
@@ -903,10 +904,11 @@ class PianoRoll {
 
         noteElement.on('point', (event)=>{ console.log('select', event)});
 
-        noteElement.on('mousedown', (event)=>{
-            if(!this.mouseScrollActive && !this.mouseZoomActive) {
+        noteElement.on('mousedown', (event) => {
+            if (!this.mouseScrollActive && !this.mouseZoomActive) {
                 this.resetMouseMoveRoot(event as MouseEvent);
                 this.dragTarget = this.rawSVGElementToWrapper[(event.target!! as HTMLElement).id];
+                console.log('drag target', this.rawSVGElementToWrapper, (event.target!! as HTMLElement).id);
                 this.initializeNoteModificationAction(this.dragTarget);
                 this.draggingActive = true;
                 svgParentObj.on('mousemove', (event)=>{
@@ -944,7 +946,7 @@ class PianoRoll {
             this.initializeNoteModificationAction(this.resizeTarget);
 
             //extracting the base dom-event from the SVG.js event so we can snapshot the current mouse coordinates
-            this.resetMouseMoveRoot(event.detail.event.detail.event);
+            // this.resetMouseMoveRoot(event.detail.event.detail.event);
 
             //inProgress - to get reizing to work with inter-select overlap and to stop resizing of 
             //clicked element at the start of another selected element, might need to remove the resize
