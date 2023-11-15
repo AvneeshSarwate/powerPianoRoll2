@@ -60,7 +60,7 @@ How note-state <-> note-svg-elements is handled is still TBD.
 /*
 General organization - 
 Look at attachHandlersOnBackground to see how notes are drawn/created.
-Look at attachHandlersOnElement to see how notes can be moved and modified. 
+Look at attachHandlersOnNote to see how notes can be moved and modified. 
 
 Basic strategy for implementing multi-note modifications - 
 - Define the 'target' element (the one the mouse gestures are happening on) and
@@ -104,7 +104,7 @@ type Box = {
 
 export class PianoRoll {
   svgRoot!: Svg;
-  noteModStartReference: any;
+  noteModStartReference: { [key: string]: { x: number, y: number, width: number, height: number } };
   notes: {[key: string]: Note};
   spatialNoteTracker: {[key: string]: Note[]};
   selectedElements: Set<Rect>;
@@ -136,7 +136,7 @@ export class PianoRoll {
   viewportWidth: number;
   maxZoom: any;
   noteCount: number;
-  refPt: any;
+  refPt!: DOMPoint;
   shiftKeyDown: boolean;
   historyList: NoteInfo[][];
   historyListIndex: number;
@@ -165,13 +165,15 @@ export class PianoRoll {
   playHandler: any;
   noteOnOffHandler: any;
   wIsDown: any;
+  debugCircle0: Circle
+  debugCircle1: Circle
   constructor(containerElementId: string, playHandler: () => void, noteOnOffHandler: () => void){
     this.svgRoot; //the svg root element
 
     /* a dictionary that, upon the start of a group drag/resize event, stores the 
      * initial positions and lengths of all notes so that the mouse modifications to
      * one note can be bounced to the rest of the selected notes*/
-    this.noteModStartReference;
+    this.noteModStartReference = {};
 
     //structure tracking both note info and note svg element state
     this.notes = {};
@@ -286,7 +288,9 @@ export class PianoRoll {
 
 
     //set the view-area so we aren't looking at the whole 127 note 100 measure piano roll
-    this.svgRoot.viewbox(0, 55*this.noteHeight, this.viewportWidth, this.viewportHeight);
+    this.svgRoot.viewbox(0, 55 * this.noteHeight, this.viewportWidth, this.viewportHeight);
+    this.debugCircle0 = this.svgRoot.circle(10).move(0, 0).fill('#f00');
+    this.debugCircle1 = this.svgRoot.circle(10).move(0, 0).fill('#0f0');
 
     this.containerElement!!.addEventListener('keydown', event => this.keydownHandler(event));
     this.containerElement!!.addEventListener('keyup', event => this.keyupHandler(event));
@@ -344,14 +348,15 @@ export class PianoRoll {
       .move(xPos + this.textDev, (127-pitch)*this.noteHeight)
       // .style('pointer-events', 'none');
     let startHandle = this.svgRoot.circle(this.handleRad).move(xPos - this.handleRad/2, yPos + (this.noteHeight-this.handleRad)/2).fill('#000');
-    let endHandle = this.svgRoot.circle(this.handleRad).move(xPos + width - this.handleRad/2, yPos + (this.noteHeight-this.handleRad)/2).fill('#000');
-    this.attachHandlersOnNote(rect, this.svgRoot);
-    this.notes[this.noteCount] = {
+    let endHandle = this.svgRoot.circle(this.handleRad).move(xPos + width - this.handleRad / 2, yPos + (this.noteHeight - this.handleRad) / 2).fill('#000');
+    const newNote: Note = {
       elem: rect, 
       info: {pitch, position, duration},
       label: text,
       handles: {start: startHandle, end: endHandle}
     }
+    this.notes[this.noteCount] = newNote
+    this.attachHandlersOnNote(newNote, this.svgRoot);
     this.noteCount++;
     if (!avoidHistoryManipulation){
       this.snapshotNoteState();
@@ -703,10 +708,10 @@ export class PianoRoll {
     this.noteModStartReference = {};
     noteIds.forEach((id: string)=>{ 
       this.noteModStartReference[id] = {
-        x:  this.notes[id].elem.x(), 
-        y:  this.notes[id].elem.y(), 
-        width: this.notes[id].elem.width(), 
-        height: this.notes[id].elem.height()
+        x:  this.notes[id].elem.x().valueOf() as number, 
+        y:  this.notes[id].elem.y().valueOf() as number, 
+        width: this.notes[id].elem.width().valueOf() as number, 
+        height: this.notes[id].elem.height().valueOf() as number
       };
     });
   }
@@ -931,11 +936,13 @@ export class PianoRoll {
   }
 
   // sets event handlers on each note element for position/resize multi-select changes
-  attachHandlersOnNote(noteElement: Element, svgParentObj: Svg){
+  attachHandlersOnNote(note: Note, svgParentObj: Svg){
     
     /* Performs the same drag deviation done on the clicked element to 
      * the other selected elements
      */
+
+    const noteElement = note.elem;
 
     noteElement.on('point', (event)=>{ console.log('select', event)});
 
@@ -973,9 +980,20 @@ export class PianoRoll {
       }
     });
 
+    note.handles.start.on('mousedown', (event) => { noteElement.fire('resizestart', {startMouseEvt: event, isEndChange: false}) })
+    note.handles.end.on('mousedown', (event) => { noteElement.fire('resizestart', {startMouseEvt: event, isEndChange: true}) })
+
     noteElement.on('resizestart', (event)=>{
       this.resizeTarget = this.rawSVGElementToWrapper[(event.target!! as HTMLElement).id];
       this.initializeNoteModificationAction(this.resizeTarget);
+
+      console.log('restireStartEvent', event);
+      //@ts-ignore
+      const isEndChange = event.detail.isEndChange;
+      //@ts-ignore
+      const startMouseEvt = event.detail.startMouseEvt;
+      const dragStartXY = this.svgMouseCoord(startMouseEvt as MouseEvent);
+
 
       //extracting the base dom-event from the SVG.js event so we can snapshot the current mouse coordinates
       // this.resetMouseMoveRoot(event.detail.event.detail.event);
@@ -992,7 +1010,12 @@ export class PianoRoll {
         let svgXY = this.svgMouseCoord(event as MouseEvent);
         let xDevRaw = svgXY.x - this.mouseMoveRoot.svgX;
         let oldX = this.noteModStartReference[this.resizeTarget!!.id()].x;
-        let isEndChange = this.resizeTarget!!.x() === oldX; //i.e, whehter you're moving the 'start' or 'end' of the note
+        let oldY = this.noteModStartReference[this.resizeTarget!!.id()].y;
+        // let isEndChange = this.resizeTarget!!.x() === oldX; //i.e, whehter you're moving the 'start' or 'end' of the note
+        this.debugCircle0.x(dragStartXY.x);
+        this.debugCircle0.y(dragStartXY.y);
+        this.debugCircle1.x(svgXY.x);
+        this.debugCircle1.y(svgXY.y);
         this.selectedNoteIds.forEach((id)=>{
           let oldNoteVals = this.noteModStartReference[id];
           //inProgress - control the resizing/overlap of the selected elements here and you don't 
