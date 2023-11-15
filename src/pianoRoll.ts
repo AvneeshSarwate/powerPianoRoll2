@@ -1,4 +1,4 @@
-import { Element, Rect, SVG, Svg, Text } from '@svgdotjs/svg.js'
+import { Circle, Element, Rect, SVG, Svg, Text } from '@svgdotjs/svg.js'
 
 /*
 basic strategy for using SVG:
@@ -78,7 +78,11 @@ type Note = {
     position: number,
     duration: number
   },
-  label: Text
+  label: Text,
+  handles: {
+    start: Circle,
+    end: Circle
+  }
 }
 
 type MouseMoveRoot = {
@@ -113,6 +117,7 @@ export class PianoRoll {
   backgroundElements: Set<Element> = new Set();
   quarterNoteWidth: number;
   noteHeight: number;
+  handleRad: number;
   whiteNotes: number[];
   noteSubDivision: number;
   timeSignature: number;
@@ -192,6 +197,7 @@ export class PianoRoll {
 
     this.quarterNoteWidth = 120; //in pixels
     this.noteHeight = 20; //in pixels
+    this.handleRad = 5; //radius of the resize handles in pixels
     this.whiteNotes = [0, 2, 4, 5, 7, 9, 11];
     this.noteSubDivision = 16; //where to draw lines and snap to grid
     this.timeSignature = 4/4; //b
@@ -325,20 +331,26 @@ export class PianoRoll {
 
 
   //duration is number of quarter notes, pitch is 0-indexed MIDI
-  addNote(pitch: number, position: number, duration: number, avoidHistoryManipulation: boolean = false){
-    let rect = this.svgRoot.rect(duration * this.quarterNoteWidth, this.noteHeight).move(position * this.quarterNoteWidth, (127 - pitch) * this.noteHeight).fill(this.noteColor);
+  addNote(pitch: number, position: number, duration: number, avoidHistoryManipulation: boolean = false) {
+    const xPos = position * this.quarterNoteWidth
+    const yPos = (127 - pitch) * this.noteHeight
+    const width = duration * this.quarterNoteWidth
+    let rect = this.svgRoot.rect(width, this.noteHeight).move(xPos, yPos).fill(this.noteColor);
     rect.id(this.noteCount.toString());
     this.rawSVGElementToWrapper[rect.id()] = rect;
     // rect.selectize({rotationPoint: false, points:['r', 'l']}).resize();
     let text = this.svgRoot.text(this.svgYToPitchString(rect.y().valueOf() as number))
       .font({size: 14})
-      .move(position*this.quarterNoteWidth + this.textDev, (127-pitch)*this.noteHeight)
+      .move(xPos + this.textDev, (127-pitch)*this.noteHeight)
       // .style('pointer-events', 'none');
+    let startHandle = this.svgRoot.circle(this.handleRad).move(xPos - this.handleRad/2, yPos + (this.noteHeight-this.handleRad)/2).fill('#000');
+    let endHandle = this.svgRoot.circle(this.handleRad).move(xPos + width - this.handleRad/2, yPos + (this.noteHeight-this.handleRad)/2).fill('#000');
     this.attachHandlersOnNote(rect, this.svgRoot);
     this.notes[this.noteCount] = {
       elem: rect, 
       info: {pitch, position, duration},
-      label: text
+      label: text,
+      handles: {start: startHandle, end: endHandle}
     }
     this.noteCount++;
     if (!avoidHistoryManipulation){
@@ -353,7 +365,10 @@ export class PianoRoll {
   deleteElement(elem: Rect){
     // elem.selectize(false);
     elem.remove();
-    this.notes[elem.id()].label.remove();
+    const note = this.notes[elem.id()]
+    note.label.remove();
+    note.handles.start.remove();
+    note.handles.end.remove();
   }
 
   deleteNotes(elements: Set<Rect>){
@@ -389,6 +404,8 @@ export class PianoRoll {
   updateNoteElement(nt: Note, position: number, pitch: number, duration: number){
     nt.elem.show();
     nt.label.show();
+    nt.handles.start.show();
+    nt.handles.end.show();
     const yPos = (127 - pitch) * this.noteHeight
     const xPos = position * this.quarterNoteWidth
     const width = duration * this.quarterNoteWidth
@@ -396,12 +413,22 @@ export class PianoRoll {
   }
 
   updateNoteElemScreenCoords(nt: Note, x?: number, y?: number, width?: number, calledFromBatchUpdate: boolean = true) {
-    if (x) nt.elem.x(x);
-    if (y) nt.elem.y(y);
-    if (width) nt.elem.width(width);
-    if (x) nt.label.x(x + this.textDev);
-    if (y) nt.label.y(y);
-    if (y) nt.label.text(this.svgYToPitchString(y));
+    x = x ?? nt.elem.x().valueOf() as number;
+    y = y ?? nt.elem.y().valueOf() as number;
+    width = width ?? nt.elem.width().valueOf() as number;
+
+    nt.elem.x(x);
+    nt.label.x(x + this.textDev);
+    nt.handles.start.x(x - this.handleRad / 2);
+
+    nt.elem.y(y);
+    nt.label.y(y);
+    nt.label.text(this.svgYToPitchString(y));
+    nt.handles.start.y(y + (this.noteHeight - this.handleRad) / 2);
+    nt.handles.end.y(y + (this.noteHeight - this.handleRad) / 2);
+    
+    nt.elem.width(width);
+    nt.handles.end.x(x + width - this.handleRad / 2);
     this.updateNoteInfo(nt, calledFromBatchUpdate);
   }
 
@@ -865,12 +892,17 @@ export class PianoRoll {
                 currentlyModifiedNotes.add(note.elem.id());
                 note.elem.show();
                 note.label.show();
-                note.elem.width((selectedNote.info.position - note.info.position)*this.quarterNoteWidth);
+                note.handles.start.show();
+                note.handles.end.show();
+                const width = (selectedNote.info.position - note.info.position) * this.quarterNoteWidth
+                this.updateNoteElemScreenCoords(note, undefined, undefined, width);
               //deleting the non-selected note
               } else if (selectedNote.info.position <= note.info.position && note.info.position < selectedNote.info.position+selectedNote.info.duration) {
                 currentlyModifiedNotes.add(note.elem.id());
                 note.elem.hide();
                 note.label.hide();
+                note.handles.start.hide();
+                note.handles.end.hide();
               }
             }
           }
